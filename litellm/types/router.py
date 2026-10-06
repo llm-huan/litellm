@@ -418,6 +418,10 @@ class GenericLiteLLMParams(CredentialLiteLLMParams, CustomPricingLiteLLMParams):
     use_in_pass_through: bool | None = False
     use_litellm_proxy: bool | None = False
     use_chat_completions_api: bool | None = None
+    chatgpt_auth_file: str | None = Field(
+        default=None,
+        description="Path to ChatGPT OAuth credentials for this deployment.",
+    )
     use_xai_oauth: bool | None = Field(
         default=False,
         description="Use stored xAI OAuth credentials when no xAI API key is configured.",

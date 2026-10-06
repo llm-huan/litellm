@@ -60,6 +60,7 @@ OPTIONAL_KWARGS_KEYS: Final = (
             "itpm",
             "otpm",
             "use_xai_oauth",
+            "chatgpt_auth_file",
             PROVIDER_AFFINITY_HEADER_KWARG_KEY,
         }
     )
@@ -129,6 +130,7 @@ def get_litellm_params(
     use_litellm_proxy: bool | None = None,
     api_version: str | None = None,
     max_retries: int | None = None,
+    chatgpt_auth_file: str | None = None,
     litellm_request_debug: bool | None = None,
     stream_chunk_size: int | None = None,
     **kwargs,
@@ -191,6 +193,7 @@ def get_litellm_params(
         "merge_reasoning_content_in_choices": merge_reasoning_content_in_choices,
         "api_version": api_version,
         "max_retries": max_retries,
+        "chatgpt_auth_file": chatgpt_auth_file,
         "use_litellm_proxy": use_litellm_proxy,
         "litellm_request_debug": litellm_request_debug,
         "stream_chunk_size": stream_chunk_size,

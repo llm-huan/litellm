@@ -172,6 +172,7 @@ class OpenAIGPTConfig(BaseLLMModelInfo, BaseConfig):
             "prompt_cache_key",
             "prompt_cache_retention",
             "store",
+            "reasoning_effort",
         ]  # works across all models
 
         model_specific_params: Final = []

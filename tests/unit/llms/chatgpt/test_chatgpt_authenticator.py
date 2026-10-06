@@ -5,7 +5,11 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
-from litellm.llms.chatgpt.authenticator import Authenticator
+from litellm.llms.chatgpt.authenticator import (
+    Authenticator,
+    get_cached_authenticator,
+    get_chatgpt_auth_file,
+)
 
 
 def _make_jwt(payload: dict) -> str:
@@ -19,6 +23,19 @@ def _make_jwt(payload: dict) -> str:
 
 
 class TestChatGPTAuthenticator:
+    def test_get_chatgpt_auth_file_accepts_mapping_and_model(self):
+        assert get_chatgpt_auth_file({"chatgpt_auth_file": "/tmp/account.json"}) == "/tmp/account.json"
+        assert get_chatgpt_auth_file({"chatgpt_auth_file": ""}) is None
+
+    def test_cached_authenticator_is_keyed_by_auth_file(self):
+        get_cached_authenticator.cache_clear()
+        with patch("os.path.exists", return_value=True):
+            first = get_cached_authenticator("/tmp/one.json")
+            second = get_cached_authenticator("/tmp/one.json")
+            other = get_cached_authenticator("/tmp/two.json")
+        assert first is second
+        assert first is not other
+
     @pytest.fixture
     def authenticator(self):
         with patch("os.path.exists", return_value=True):
