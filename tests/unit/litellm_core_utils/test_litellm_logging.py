@@ -9558,15 +9558,12 @@ def _vcr_outcome_gate(request, vcr):
     yield
     record_vcr_outcome(request, vcr)
 
-
 @pytest_asyncio.fixture(loop_scope="function")
 async def drain_logging_worker(isolate_litellm_state: None) -> AsyncIterator[None]:
     yield
     await asyncio.wait_for(GLOBAL_LOGGING_WORKER.flush(), timeout=LOGGING_WORKER_DRAIN_TIMEOUT_SECONDS)
 
-
 LOGGING_WORKER_DRAIN_TIMEOUT_SECONDS: Final = LOGGING_WORKER_MAX_TIME_PER_COROUTINE + 5.0
-
 
 @pytest.fixture(scope="function")
 def isolate_litellm_state():
@@ -9605,7 +9602,6 @@ def isolate_litellm_state():
         if attr in _DEFAULTS:
             setattr(litellm, attr, _DEFAULTS[attr])
 
-
 _LIST_ATTRS = (
     "callbacks",
     "success_callback",
@@ -9633,7 +9629,6 @@ _SCALAR_ATTRS = (
 
 _DEFAULTS: dict = {}
 
-
 @pytest.fixture(scope="module")
 def setup_and_teardown():
     """
@@ -9655,7 +9650,6 @@ def setup_and_teardown():
         if hasattr(litellm, "in_memory_llm_clients_cache"):
             litellm.in_memory_llm_clients_cache.flush_cache()
     yield
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 @pytest.mark.parametrize(
@@ -9704,7 +9698,6 @@ def test_get_usage(response_obj, expected_values):
     assert usage.completion_tokens == expected_values[1]
     assert usage.total_tokens == expected_values[2]
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_usage_from_image_generation_response():
     """
@@ -9752,7 +9745,6 @@ def test_get_usage_from_image_generation_response():
     assert usage.completion_tokens_details.image_tokens == 272
     assert usage.completion_tokens_details.text_tokens == 100
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_additional_headers():
     additional_headers = {
@@ -9793,11 +9785,9 @@ def test_get_additional_headers():
     assert additional_logging_headers.get("llm_provider-request-id") == "req_01F6CycZZPSHKRCCctcS1Vto"
     assert additional_logging_headers.get("llm_provider-anthropic-ratelimit-requests-reset") == "2024-10-29T23:57:40Z"
 
-
 def all_fields_present(standard_logging_metadata: StandardLoggingMetadata):
     for field in StandardLoggingMetadata.__annotations__.keys():
         assert field in standard_logging_metadata
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 @pytest.mark.parametrize(
@@ -9830,14 +9820,12 @@ def test_get_standard_logging_metadata(metadata_key, metadata_value):
     # Assert that the specific metadata field is set correctly
     assert standard_logging_metadata[metadata_key] == metadata_value
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_standard_logging_metadata_user_api_key_hash():
     valid_hash = "a" * 64  # 64 character string
     metadata = {"user_api_key": valid_hash}
     result = StandardLoggingPayloadSetup.get_standard_logging_metadata(metadata)
     assert result["user_api_key_hash"] == valid_hash
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_standard_logging_metadata_invalid_user_api_key():
@@ -9847,7 +9835,6 @@ def test_get_standard_logging_metadata_invalid_user_api_key():
     all_fields_present(result)
     assert result["user_api_key_hash"] is None
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_standard_logging_metadata_non_string_user_api_key():
     """Non-string user_api_key should not be set as user_api_key_hash."""
@@ -9856,7 +9843,6 @@ def test_get_standard_logging_metadata_non_string_user_api_key():
     all_fields_present(result)
     assert result["user_api_key_hash"] is None
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_standard_logging_metadata_none_user_api_key():
     """None user_api_key should not be set as user_api_key_hash."""
@@ -9864,7 +9850,6 @@ def test_get_standard_logging_metadata_none_user_api_key():
     result = StandardLoggingPayloadSetup.get_standard_logging_metadata(metadata)
     all_fields_present(result)
     assert result["user_api_key_hash"] is None
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_standard_logging_metadata_invalid_keys():
@@ -9878,7 +9863,6 @@ def test_get_standard_logging_metadata_invalid_keys():
     assert result["user_api_key_alias"] == "test_alias"
     assert "invalid_key" not in result
     assert "another_invalid_key" not in result
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_cleanup_timestamps():
@@ -9914,7 +9898,6 @@ def test_cleanup_timestamps():
     with pytest.raises(ValueError, match="start_time is required, got=invalid of type <class 'str'>"):
         StandardLoggingPayloadSetup.cleanup_timestamps("invalid", end_float, completion_float)
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_model_cost_information():
     """Test get_model_cost_information with different inputs"""
@@ -9947,7 +9930,6 @@ def test_get_model_cost_information():
     # assert all fields in StandardLoggingModelInformation are present
     assert all(field in result for field in StandardLoggingModelInformation.__annotations__)
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_model_cost_information_custom_pricing_uses_base_model():
     result = StandardLoggingPayloadSetup.get_model_cost_information(
@@ -9958,7 +9940,6 @@ def test_get_model_cost_information_custom_pricing_uses_base_model():
     )
     assert result["model_map_value"] is not None
     assert result["model_map_key"] != "invoke_test_claude"
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_standard_logging_payload_uses_deployment_when_no_base_model():
@@ -10017,7 +9998,6 @@ def test_standard_logging_payload_uses_deployment_when_no_base_model():
     assert payload["model_map_information"]["model_map_value"] is not None
     assert payload["model_map_information"]["model_map_key"] != "invoke_test_claude"
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_hidden_params():
     """Test get_hidden_params with different inputs"""
@@ -10053,7 +10033,6 @@ def test_get_hidden_params():
     # assert all fields in StandardLoggingHiddenParams are present
     assert all(field in result for field in StandardLoggingHiddenParams.__annotations__)
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_final_response_obj():
     """Test get_final_response_obj with different input types and redaction scenarios"""
@@ -10084,7 +10063,6 @@ def test_get_final_response_obj():
     finally:
         # Reset litellm.turn_off_message_logging to its original value
         litellm.turn_off_message_logging = False
-
 
 def testget_standard_logging_payload_trace_id():
     """Test get_standard_logging_payload_trace_id with different input scenarios"""
@@ -10123,7 +10101,6 @@ def testget_standard_logging_payload_trace_id():
     assert result == "12345"
     assert isinstance(result, str)
 
-
 def testget_standard_logging_payload_trace_id_prioritizes_trace_id_when_flag_on(monkeypatch):
     """With request_correlation_in_logs on, an explicit litellm_trace_id wins over litellm_session_id."""
     from unittest.mock import MagicMock
@@ -10137,7 +10114,6 @@ def testget_standard_logging_payload_trace_id_prioritizes_trace_id_when_flag_on(
         logging_obj=mock_logging_obj, litellm_params=litellm_params
     )
     assert result == "the-trace-id"
-
 
 def testget_standard_logging_payload_trace_id_prioritizes_session_id_when_flag_off(monkeypatch):
     """With request_correlation_in_logs off (default), legacy behavior is preserved:
@@ -10153,7 +10129,6 @@ def testget_standard_logging_payload_trace_id_prioritizes_session_id_when_flag_o
         logging_obj=mock_logging_obj, litellm_params=litellm_params
     )
     assert result == "the-session-id"
-
 
 def testget_standard_logging_payload_session_id_when_flag_on(monkeypatch):
     """Test get_standard_logging_payload_session_id with different input scenarios, flag enabled"""
@@ -10207,7 +10182,6 @@ def testget_standard_logging_payload_session_id_when_flag_on(monkeypatch):
     )
     assert result == ""
 
-
 def testget_standard_logging_payload_session_id_empty_when_flag_off(monkeypatch):
     """When request_correlation_in_logs is off (default), session_id is always empty,
     even if litellm_session_id was explicitly supplied - preserves the pre-existing
@@ -10223,7 +10197,6 @@ def testget_standard_logging_payload_session_id_empty_when_flag_off(monkeypatch)
         logging_obj=mock_logging_obj, litellm_params=litellm_params
     )
     assert result == ""
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_truncate_standard_logging_payload():
@@ -10250,7 +10223,6 @@ def test_truncate_standard_logging_payload():
     assert len(str(truncated["response"])) < 10_500
     assert len(str(truncated["error_str"])) < 10_500
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_truncate_standard_logging_payload_keeps_a_partial_payload_intact():
     """A payload built with only some of its fields comes back with exactly those keys and values"""
@@ -10259,13 +10231,11 @@ def test_truncate_standard_logging_payload_keeps_a_partial_payload_intact():
 
     assert _custom_logger.truncate_standard_logging_payload_content(partial_payload) == partial_payload
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_strip_trailing_slash():
     common_api_base = "https://api.test.com"
     assert StandardLoggingPayloadSetup.strip_trailing_slash(common_api_base + "/") == common_api_base
     assert StandardLoggingPayloadSetup.strip_trailing_slash(common_api_base) == common_api_base
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_error_information():
@@ -10303,7 +10273,6 @@ def test_get_error_information():
     assert result["llm_provider"] == "openai"
     assert result["error_message"] == "litellm.RateLimitError: Test error"
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_response_time():
     """Test get_response_time with different streaming scenarios"""
@@ -10339,7 +10308,6 @@ def test_get_response_time():
     # For streaming, should return completion_start_time - start_time
     assert response_time == 2.0
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 @pytest.mark.parametrize(
     "metadata, expected_requester_metadata",
@@ -10361,7 +10329,6 @@ def test_get_response_time():
 def test_standard_logging_metadata_requester_metadata(metadata, expected_requester_metadata):
     result = StandardLoggingPayloadSetup.get_standard_logging_metadata(metadata)
     assert result["requester_metadata"] == expected_requester_metadata
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_cost_breakdown_in_standard_logging_payload():
@@ -10452,7 +10419,6 @@ def test_cost_breakdown_in_standard_logging_payload():
 
     print("✅ Cost breakdown test passed!")
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_cost_breakdown_missing_in_standard_logging_payload():
     """
@@ -10512,7 +10478,6 @@ def test_cost_breakdown_missing_in_standard_logging_payload():
     assert payload["response_cost"] == 0.0001
 
     print("✅ Cost breakdown missing test passed!")
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 @pytest.mark.parametrize(
@@ -10601,7 +10566,6 @@ def test_usage_dict_roundtrip_in_payload(use_combined_usage_object):
     assert usage_obj["completion_tokens"] == 58
     assert usage_obj["total_tokens"] == 100
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_standard_logging_payload_uses_actual_model_for_azure_router():
     from litellm.litellm_core_utils.litellm_logging import (
@@ -10649,7 +10613,6 @@ def test_standard_logging_payload_uses_actual_model_for_azure_router():
     )
     assert payload is not None
     assert payload["model"] == "azure_ai/gpt-5-nano-2025-08-07"
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_standard_logging_payload_uses_actual_model_for_azure_router_with_underscore():
@@ -10699,7 +10662,6 @@ def test_standard_logging_payload_uses_actual_model_for_azure_router_with_unders
     assert payload is not None
     assert payload["model"] == "azure_ai/gpt-5-nano-2025-08-07"
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_merge_litellm_metadata_basic():
     """
@@ -10731,7 +10693,6 @@ def test_merge_litellm_metadata_basic():
     assert result["model_info"] == {"id": "model-123"}
     assert result["tags"] == ["tag1", "tag2"]
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_merge_litellm_metadata_precedence():
     """
@@ -10758,14 +10719,11 @@ def test_merge_litellm_metadata_precedence():
     # litellm_metadata values should only be included if not in metadata
     assert result["model_group"] == "gpt-4-group"
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_merge_litellm_metadata_skip_non_serializable():
     """
     Test that non-serializable objects like UserAPIKeyAuth are skipped.
     """
-    from litellm.proxy._types import UserAPIKeyAuth
-
     user_api_key_auth = UserAPIKeyAuth(
         api_key="test-key",
         user_id="test-user",
@@ -10792,7 +10750,6 @@ def test_merge_litellm_metadata_skip_non_serializable():
     assert result["user_api_key"] == "test-key-123"
     assert result["safe_field"] == "safe_value"
     assert result["model_group"] == "gpt-4-group"
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_merge_litellm_metadata_empty_params():
@@ -10828,7 +10785,6 @@ def test_merge_litellm_metadata_empty_params():
     }
     result = StandardLoggingPayloadSetup.merge_litellm_metadata(litellm_params)
     assert result == {}
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_merge_litellm_metadata_bedrock_passthrough_scenario():
@@ -10889,9 +10845,7 @@ def test_merge_litellm_metadata_bedrock_passthrough_scenario():
     # Verify total number of fields (9 user fields + 4 model fields = 13)
     assert len(result) == 13
 
-
 service_logger = ServiceLogging()
-
 
 def setup_logging():
     return Logging(
@@ -10903,7 +10857,6 @@ def setup_logging():
         litellm_call_id="123",
         function_id="456",
     )
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_get_callback_name():
@@ -10929,7 +10882,6 @@ def test_get_callback_name():
     # Test string callback
     assert logging._get_callback_name("callback_string") == "callback_string"
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_is_internal_litellm_proxy_callback():
     """
@@ -10949,7 +10901,6 @@ def test_is_internal_litellm_proxy_callback():
 
     # Test string callback
     assert logging._is_internal_litellm_proxy_callback("callback_string") == False
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_should_run_sync_callbacks_for_async_calls():
@@ -10975,7 +10926,6 @@ def test_should_run_sync_callbacks_for_async_calls():
     # Test with internal callback only
     litellm.success_callback = [_PROXY_MaxIterationsHandler]
     assert logging._should_run_sync_callbacks_for_async_calls() == False
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "drain_logging_worker", "isolate_litellm_state", "setup_and_teardown")
 def test_remove_internal_litellm_callbacks():

@@ -1,14 +1,12 @@
-import asyncio
+import asyncio, importlib, re
 import base64
 import contextlib
 import contextvars
-import importlib
 import io
 import json
 import logging
 import os
 import queue
-import re
 import threading
 from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -20,7 +18,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 import respx
-from dotenv import load_dotenv
 from jsonschema import validate
 
 import litellm
@@ -39,7 +36,6 @@ from litellm.constants import DEFAULT_MOCK_RESPONSE_COMPLETION_TOKEN_COUNT
 from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.integrations.custom_logger import CustomLogger
 from litellm.litellm_core_utils.get_litellm_params import get_litellm_params
-from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 from litellm.litellm_core_utils.thread_pool_executor import executor as logging_executor
 from litellm.llms.base_llm.base_model_iterator import MockResponseIterator
 from litellm.proxy.utils import is_valid_api_key
@@ -67,13 +63,16 @@ from litellm.types.utils import (
     bedrock_batch_litellm_params,
 )
 from litellm.types.videos.main import VideoObject
-from litellm.utils import (
+from litellm.utils import(
+    _invalidate_model_cost_lowercase_map,
     CustomStreamWrapper,
+    filter_out_litellm_params,
+    get_llm_provider,
+    get_optional_params_embeddings,
     ProviderConfigManager,
     TextCompletionStreamWrapper,
     _check_provider_match,
     _get_potential_model_names,
-    _invalidate_model_cost_lowercase_map,
     _is_streaming_request,
     _run_success_deployment_hook_on_converted_chat_stream,
     _snapshot_exception_for_hook,
@@ -81,18 +80,13 @@ from litellm.utils import (
     async_post_call_success_deployment_hook,
     calculate_max_parallel_requests,
     client,
-    filter_out_litellm_params,
-    get_llm_provider,
     get_non_default_completion_params,
-    get_optional_params_embeddings,
     get_optional_params_image_gen,
     get_prompt_cache_min_tokens,
     is_cached_message,
     is_prompt_caching_valid_prompt,
     validate_chat_completion_tool_choice,
 )
-from tests._vcr_conftest_common import install_live_call_probe, record_vcr_outcome
-from tests.fake_openai_endpoint import ensure_fake_openai_endpoint
 
 # Adds the parent directory to the system path
 
@@ -1416,6 +1410,7 @@ for commitment in BEDROCK_COMMITMENTS:
     block_list.add(f"bedrock/*/{commitment}/cohere.command-text-v14")
     block_list.add(f"bedrock/*/{commitment}/cohere.command-light-text-v14")
 
+print("block_list", block_list)
 
 
 @pytest.mark.parametrize(
@@ -1452,6 +1447,7 @@ def test_pre_process_non_default_params(model, custom_llm_provider):
         additional_drop_params=None,
         provider_config=provider_config,
     )
+    print(processed_non_default_params)
     # Vertex AI / Gemini uses Pydantic's model_json_schema() which doesn't
     # include additionalProperties: False (Gemini rejects it).  Other
     # providers use OpenAI's to_strict_json_schema() which does.
@@ -1519,6 +1515,8 @@ def test_vertex_params_not_stripped_for_vertex_family(model, custom_llm_provider
 
 
 from litellm.utils import supports_function_calling
+from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
+from tests._vcr_conftest_common import install_live_call_probe, record_vcr_outcome
 
 
 class TestProxyFunctionCalling:
@@ -3156,7 +3154,9 @@ class TestExtraBodyCannotOverrideModel:
                 }
             ]
 
-        untouched = litellm.get_optional_params(model="my-vllm-model", custom_llm_provider="hosted_vllm", tools=tools())
+        untouched = litellm.get_optional_params(
+            model="my-vllm-model", custom_llm_provider="hosted_vllm", tools=tools()
+        )
         assert untouched["tools"][0]["function"]["custom_marker"] == "LEAK", untouched
 
         result = litellm.get_optional_params(
@@ -4147,9 +4147,7 @@ def test_is_prompt_caching_valid_prompt_stops_counting_once_the_minimum_is_reach
     assert is_prompt_caching_valid_prompt(model="claude-opus-4-8", messages=long_prompt, min_token_count=1024) is True
     assert sum(counted_messages) < len(long_prompt), sum(counted_messages)
 
-    full_count = litellm.token_counter(
-        model="claude-opus-4-8", messages=long_prompt, use_default_image_token_count=True
-    )
+    full_count = litellm.token_counter(model="claude-opus-4-8", messages=long_prompt, use_default_image_token_count=True)
     assert (
         is_prompt_caching_valid_prompt(model="claude-opus-4-8", messages=long_prompt, min_token_count=full_count)
         is True
@@ -4612,13 +4610,7 @@ _SUCCESS_RESPONSES_BY_CALL_TYPE: Final = (
     pytest.param(EmbeddingResponse(model="text-embedding-3-small"), CallTypes.aembedding, id="embedding"),
     pytest.param(
         ResponsesAPIResponse(
-            id="resp_abc",
-            created_at=1,
-            output=[],
-            parallel_tool_calls=False,
-            tool_choice="auto",
-            tools=[],
-            model="gpt-5.6",
+            id="resp_abc", created_at=1, output=[], parallel_tool_calls=False, tool_choice="auto", tools=[], model="gpt-5.6"
         ),
         CallTypes.aresponses,
         id="responses",
@@ -4646,9 +4638,7 @@ async def test_success_deployment_hook_raising_keeps_response_and_runs_later_hoo
 
     assert result is response
     assert second_hook.seen_responses == (response,)
-    failure_logs: Final = tuple(
-        r for r in caplog.records if "async_post_call_success_deployment_hook error" in r.message
-    )
+    failure_logs: Final = tuple(r for r in caplog.records if "async_post_call_success_deployment_hook error" in r.message)
     assert len(failure_logs) == 1
     assert "_ChatShapedSuccessDeploymentHook" in failure_logs[0].message
     assert str(call_type) in failure_logs[0].message
@@ -6541,9 +6531,7 @@ def test_function_setup_logs_the_search_query_edit_prompt_and_ocr_document_summa
 
 
 @pytest.mark.parametrize("original_function", ("atext_completion", "text_completion"))
-def test_function_setup_without_a_prompt_leaves_the_missing_prompt_to_request_validation(
-    original_function: str,
-) -> None:
+def test_function_setup_without_a_prompt_leaves_the_missing_prompt_to_request_validation(original_function: str) -> None:
     assert _logged_request_messages(original_function, model="gpt-4o") is None
 
 
@@ -6585,7 +6573,6 @@ def _vcr_outcome_gate(request, vcr):
     yield
     record_vcr_outcome(request, vcr)
 
-
 @pytest.fixture(scope="function")
 def setup_and_teardown():
     """
@@ -6599,16 +6586,13 @@ def setup_and_teardown():
     loop.close()
     asyncio.set_event_loop(None)
 
-
 MODEL: Final = "anthropic/claude-haiku-4-5"
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_validate_tool_choice_none():
     """Test that None is returned as-is."""
     result = validate_chat_completion_tool_choice(None, model=MODEL)
     assert result is None
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_validate_tool_choice_string():
@@ -6617,7 +6601,6 @@ def test_validate_tool_choice_string():
     assert validate_chat_completion_tool_choice("none", model=MODEL) == "none"
     assert validate_chat_completion_tool_choice("required", model=MODEL) == "required"
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_validate_tool_choice_standard_dict():
     """Test standard OpenAI format with function."""
@@ -6625,14 +6608,12 @@ def test_validate_tool_choice_standard_dict():
     result = validate_chat_completion_tool_choice(tool_choice, model=MODEL)
     assert result == tool_choice
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_validate_tool_choice_cursor_format():
     """Cursor IDE format {"type": "auto"} is unwrapped to the bare string."""
     assert validate_chat_completion_tool_choice({"type": "auto"}, model=MODEL) == "auto"
     assert validate_chat_completion_tool_choice({"type": "none"}, model=MODEL) == "none"
     assert validate_chat_completion_tool_choice({"type": "required"}, model=MODEL) == "required"
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 @pytest.mark.parametrize(
@@ -6655,7 +6636,6 @@ def test_validate_tool_choice_invalid_dict_is_a_400(tool_choice):
     assert exc_info.value.status_code == 400
     assert exc_info.value.model == MODEL
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 @pytest.mark.parametrize("tool_choice", [123, []])
 def test_validate_tool_choice_invalid_type_is_a_400(tool_choice):
@@ -6666,7 +6646,6 @@ def test_validate_tool_choice_invalid_type_is_a_400(tool_choice):
         validate_chat_completion_tool_choice(tool_choice, model=MODEL)
     assert exc_info.value.status_code == 400
 
-
 @pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_validate_tool_choice_without_model_is_still_a_400():
     """Callers that predate the model argument keep getting a 400, with an empty model on the error."""
@@ -6675,19 +6654,11 @@ def test_validate_tool_choice_without_model_is_still_a_400():
     assert exc_info.value.status_code == 400
     assert exc_info.value.model == ""
 
-
 @pytest.fixture()
 def _vcr_outcome_gate_local_testing(request, vcr):
     install_live_call_probe(request, vcr)
     yield
     record_vcr_outcome(request, vcr)
-
-
-@pytest.fixture(scope="session")
-def fake_openai_endpoint():
-    ensure_fake_openai_endpoint()
-    yield
-
 
 @pytest.fixture(scope="function")
 def isolate_litellm_state():
@@ -6741,7 +6712,6 @@ def isolate_litellm_state():
             setattr(litellm, attr, original_value)
     _invalidate_model_cost_lowercase_map()
 
-
 _SCALAR_DEFAULTS = {
     "num_retries": getattr(litellm, "num_retries", None),
     "num_retries_per_request": getattr(litellm, "num_retries_per_request", None),
@@ -6761,7 +6731,6 @@ _SCALAR_DEFAULTS = {
     "api_base": getattr(litellm, "api_base", None),
     "api_key": getattr(litellm, "api_key", None),
 }
-
 
 @pytest.fixture(scope="module")
 def setup_and_teardown_local_testing():
@@ -6785,16 +6754,8 @@ def setup_and_teardown_local_testing():
             litellm.in_memory_llm_clients_cache.flush_cache()
     yield
 
-
-# What is this?
-## This tests the `get_optional_params_embeddings` function
-
-load_dotenv()
-
-
 @pytest.mark.usefixtures(
     "_vcr_outcome_gate_local_testing",
-    "fake_openai_endpoint",
     "isolate_litellm_state",
     "setup_and_teardown_local_testing",
 )
@@ -6818,13 +6779,8 @@ def test_vertex_projects():
     assert "vertex_ai_project" in optional_params
     assert "vertex_ai_location" in optional_params
 
-
-# test_vertex_projects()
-
-
 @pytest.mark.usefixtures(
     "_vcr_outcome_gate_local_testing",
-    "fake_openai_endpoint",
     "isolate_litellm_state",
     "setup_and_teardown_local_testing",
 )
@@ -6838,10 +6794,8 @@ def test_bedrock_embed_v2_regular():
     print(f"received optional_params: {optional_params}")
     assert optional_params == {"dimensions": 512}
 
-
 @pytest.mark.usefixtures(
     "_vcr_outcome_gate_local_testing",
-    "fake_openai_endpoint",
     "isolate_litellm_state",
     "setup_and_teardown_local_testing",
 )
@@ -6858,10 +6812,8 @@ def test_bedrock_embed_v2_with_drop_params():
     print(f"received optional_params: {optional_params}")
     assert optional_params == {"dimensions": 512, "embeddingTypes": ["binary"]}
 
-
 @pytest.mark.usefixtures(
     "_vcr_outcome_gate_local_testing",
-    "fake_openai_endpoint",
     "isolate_litellm_state",
     "setup_and_teardown_local_testing",
 )
@@ -6881,10 +6833,8 @@ def test_openai_non_text_embedding_3_with_allowed_openai_params():
     print(f"received optional_params: {optional_params}")
     assert optional_params.get("dimensions") == 1024
 
-
 @pytest.mark.usefixtures(
     "_vcr_outcome_gate_local_testing",
-    "fake_openai_endpoint",
     "isolate_litellm_state",
     "setup_and_teardown_local_testing",
 )
@@ -6909,10 +6859,8 @@ def test_openai_non_text_embedding_3_without_allowed_openai_params_raises():
     finally:
         litellm.drop_params = prev_drop_params
 
-
 @pytest.mark.usefixtures(
     "_vcr_outcome_gate_local_testing",
-    "fake_openai_endpoint",
     "isolate_litellm_state",
     "setup_and_teardown_local_testing",
 )
@@ -6939,10 +6887,8 @@ def test_openai_non_text_embedding_3_drop_params_per_call():
     finally:
         litellm.drop_params = prev_drop_params
 
-
 @pytest.mark.usefixtures(
     "_vcr_outcome_gate_local_testing",
-    "fake_openai_endpoint",
     "isolate_litellm_state",
     "setup_and_teardown_local_testing",
 )
@@ -6968,13 +6914,11 @@ def test_openai_non_text_embedding_3_drop_params_global():
     finally:
         litellm.drop_params = prev_drop_params
 
-
 @pytest.fixture()
 def _vcr_outcome_gate_search_tests(request, vcr):
     install_live_call_probe(request, vcr)
     yield
     record_vcr_outcome(request, vcr)
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate_search_tests")
 def test_search_tool_name_in_all_litellm_params():
@@ -6984,7 +6928,6 @@ def test_search_tool_name_in_all_litellm_params():
     If missing, it gets passed to provider APIs causing errors.
     """
     assert "search_tool_name" in all_litellm_params
-
 
 @pytest.mark.usefixtures("_vcr_outcome_gate_search_tests")
 def test_filter_out_search_tool_name():

@@ -1,31 +1,24 @@
-import asyncio
-import base64
-import importlib
+import asyncio, base64, importlib, uuid
 import json
 import logging
 import os
 import re
-import uuid
-from datetime import datetime
 from typing import Final
 from unittest.mock import MagicMock, patch
 
 import pytest
-from dotenv import load_dotenv
 
 import litellm
-from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
-from litellm.litellm_core_utils.prompt_templates.factory import (
+from litellm.litellm_core_utils.prompt_templates.factory import(
     BEDROCK_DOCUMENT_PLACEHOLDER_TEXT,
-    THOUGHT_SIGNATURE_SEPARATOR,
     BedrockConverseMessagesProcessor,
     BedrockImageProcessor,
     _bedrock_converse_messages_pt,
     _bedrock_tools_pt,
-    _convert_to_bedrock_tool_call_invoke,
-    _convert_to_bedrock_tool_call_result,
     _rename_duplicate_bedrock_document_names,
+    _convert_to_bedrock_tool_call_invoke,
     _sanitize_anthropic_tool_use_id,
+    _convert_to_bedrock_tool_call_result,
     anthropic_messages_pt,
     convert_to_anthropic_tool_result,
     convert_to_gemini_tool_call_result,
@@ -33,11 +26,18 @@ from litellm.litellm_core_utils.prompt_templates.factory import (
     make_valid_bedrock_tool_name,
     ollama_pt,
     sanitize_messages_for_tool_calling,
+    THOUGHT_SIGNATURE_SEPARATOR,
 )
 from litellm.types.llms.openai import ChatCompletionToolMessage
-from litellm.utils import Rules, _invalidate_model_cost_lowercase_map, function_setup, validate_and_fix_openai_messages
+from litellm.utils import(
+    _invalidate_model_cost_lowercase_map,
+    function_setup,
+    Rules,
+    validate_and_fix_openai_messages,
+)
+from datetime import datetime
+from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 from tests._vcr_conftest_common import install_live_call_probe, record_vcr_outcome
-from tests.fake_openai_endpoint import ensure_fake_openai_endpoint
 
 
 def _get_gemini_function_response_inline_data_parts(result):
@@ -360,6 +360,7 @@ def test_bedrock_validate_format_image_or_video():
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
     }
     for mime, expected in valid_document_formats.items():
+        print("testing mime", mime, "expected", expected)
         result = BedrockImageProcessor._validate_format(mime, mime.split("/")[1])
         assert result == expected, f"Expected {expected}, got {result}"
 
@@ -1929,8 +1930,8 @@ def test_bedrock_tools_unpack_defs_no_oom_with_nested_refs():
     This test creates a schema with multiple nested $defs that reference each other
     to verify the fix prevents memory explosion while still correctly resolving refs.
     """
-    import copy
     import sys
+    import copy
 
     from litellm.litellm_core_utils.prompt_templates.factory import _bedrock_tools_pt
 
@@ -4147,9 +4148,7 @@ def test_bedrock_converse_messages_pt_user_message_without_content_adds_no_block
 
     assert _bedrock_converse_messages_pt(
         messages=with_message, model="anthropic.claude-haiku-4-5", llm_provider="bedrock"
-    ) == _bedrock_converse_messages_pt(
-        messages=without_message, model="anthropic.claude-haiku-4-5", llm_provider="bedrock"
-    )
+    ) == _bedrock_converse_messages_pt(messages=without_message, model="anthropic.claude-haiku-4-5", llm_provider="bedrock")
 
 
 @pytest.mark.asyncio
@@ -4279,13 +4278,6 @@ def _vcr_outcome_gate(request, vcr):
     yield
     record_vcr_outcome(request, vcr)
 
-
-@pytest.fixture(scope="session")
-def fake_openai_endpoint():
-    ensure_fake_openai_endpoint()
-    yield
-
-
 @pytest.fixture(scope="function")
 def isolate_litellm_state():
     """
@@ -4338,7 +4330,6 @@ def isolate_litellm_state():
             setattr(litellm, attr, original_value)
     _invalidate_model_cost_lowercase_map()
 
-
 _SCALAR_DEFAULTS = {
     "num_retries": getattr(litellm, "num_retries", None),
     "num_retries_per_request": getattr(litellm, "num_retries_per_request", None),
@@ -4358,7 +4349,6 @@ _SCALAR_DEFAULTS = {
     "api_base": getattr(litellm, "api_base", None),
     "api_key": getattr(litellm, "api_key", None),
 }
-
 
 @pytest.fixture(scope="module")
 def setup_and_teardown():
@@ -4382,13 +4372,7 @@ def setup_and_teardown():
             litellm.in_memory_llm_clients_cache.flush_cache()
     yield
 
-
-#### What this tests ####
-#  Allow the user to map the function to the prompt, if the model doesn't support function calling
-
-
-## case 1: set_function_to_prompt not set
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "isolate_litellm_state", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "isolate_litellm_state", "setup_and_teardown")
 def test_function_call_non_openai_model():
     try:
         model = "claude-3-5-haiku-20241022"
@@ -4416,19 +4400,7 @@ def test_function_call_non_openai_model():
         print(e)
         pass
 
-
-# test_function_call_non_openai_model()
-
-# test_function_call_non_openai_model_litellm_mod_set()
-
-
-# What is this?
-## Unit tests for the 'function_setup()' function
-
-load_dotenv()
-
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "isolate_litellm_state", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "isolate_litellm_state", "setup_and_teardown")
 def test_empty_content():
     """
     Make a chat completions request with empty content -> expect this to work
@@ -4446,8 +4418,7 @@ def test_empty_content():
         litellm_call_id=str(uuid.uuid4()),
     )
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "isolate_litellm_state", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "isolate_litellm_state", "setup_and_teardown")
 def test_thought_signature_removal_for_non_gemini():
     """
     Test that thought signatures are removed from tool call IDs when sending to non-Gemini models
@@ -4495,8 +4466,7 @@ def test_thought_signature_removal_for_non_gemini():
     assert THOUGHT_SIGNATURE_SEPARATOR not in processed_messages[1]["tool_calls"][0]["id"]
     assert THOUGHT_SIGNATURE_SEPARATOR not in processed_messages[2]["tool_call_id"]
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "isolate_litellm_state", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "isolate_litellm_state", "setup_and_teardown")
 def test_thought_signature_preserved_for_gemini():
     """
     Test that thought signatures are preserved when sending to Gemini models
@@ -4542,8 +4512,7 @@ def test_thought_signature_preserved_for_gemini():
     assert THOUGHT_SIGNATURE_SEPARATOR in processed_messages[1]["tool_calls"][0]["id"]
     assert THOUGHT_SIGNATURE_SEPARATOR in processed_messages[2]["tool_call_id"]
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "isolate_litellm_state", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "isolate_litellm_state", "setup_and_teardown")
 def test_thought_signature_removal_with_multiple_tool_calls():
     """
     Test that thought signatures are removed from multiple tool calls
@@ -4597,8 +4566,7 @@ def test_thought_signature_removal_with_multiple_tool_calls():
     assert processed_messages[2]["tool_call_id"] == "call_1"
     assert processed_messages[3]["tool_call_id"] == "call_2"
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "isolate_litellm_state", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "isolate_litellm_state", "setup_and_teardown")
 def test_messages_without_tool_calls_unchanged():
     """
     Test that messages without tool calls pass through unchanged

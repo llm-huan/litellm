@@ -1,18 +1,15 @@
-import asyncio
-import importlib
 from typing import Final
 
-import pytest
+import asyncio, importlib, litellm, pytest
 
-import litellm
 from litellm.constants import RESPONSE_FORMAT_TOOL_NAME
-from litellm.litellm_core_utils.llm_response_utils.convert_dict_to_response import (
-    LiteLLMResponseObjectHandler,
+from litellm.litellm_core_utils.llm_response_utils.convert_dict_to_response import(
     _handle_invalid_parallel_tool_calls,
     _should_convert_tool_call_to_json_mode,
     convert_to_model_response_object,
+    LiteLLMResponseObjectHandler,
 )
-from litellm.types.utils import (
+from litellm.types.utils import(
     ChatCompletionMessageCustomToolCall,
     ChatCompletionMessageToolCall,
     Function,
@@ -20,7 +17,6 @@ from litellm.types.utils import (
     ModelResponse,
 )
 from tests._vcr_conftest_common import install_live_call_probe, record_vcr_outcome
-from tests.fake_openai_endpoint import ensure_fake_openai_endpoint
 
 OPENAI_CUSTOM_TOOL_CALL_RESPONSE = {
     "id": "chatcmpl-abc",
@@ -40,7 +36,7 @@ OPENAI_CUSTOM_TOOL_CALL_RESPONSE = {
                         "type": "custom",
                         "custom": {
                             "name": "ApplyPatch",
-                            "input": '*** Begin Patch\n*** Update File: main.py\n@@\n+def hello():\n+    print("Hello")\n*** End Patch\n',
+                            "input": "*** Begin Patch\n*** Update File: main.py\n@@\n+def hello():\n+    print(\"Hello\")\n*** End Patch\n",
                         },
                     }
                 ],
@@ -210,7 +206,6 @@ def _vcr_outcome_gate(request, vcr):
     yield
     record_vcr_outcome(request, vcr)
 
-
 @pytest.fixture(scope="session")
 def event_loop():
     try:
@@ -219,13 +214,6 @@ def event_loop():
         loop = asyncio.new_event_loop()
     yield loop
     loop.close()
-
-
-@pytest.fixture(scope="session")
-def fake_openai_endpoint():
-    ensure_fake_openai_endpoint()
-    yield
-
 
 @pytest.fixture(scope="function")
 def setup_and_teardown(event_loop):
@@ -260,7 +248,6 @@ def setup_and_teardown(event_loop):
     if pending:
         event_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
 
-
 _SCALAR_DEFAULTS = {
     "num_retries": getattr(litellm, "num_retries", None),
     "set_verbose": getattr(litellm, "set_verbose", False),
@@ -275,8 +262,7 @@ _SCALAR_DEFAULTS = {
     "cohere_key": getattr(litellm, "cohere_key", None),
 }
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_basic():
     # Test basic conversion with minimal input
     response_dict = {
@@ -290,8 +276,7 @@ def test_convert_to_image_response_basic():
     assert result.created == 1234567890
     assert result.data[0].url == "http://example.com/image.jpg"
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_with_hidden_params():
     # Test with hidden params
     response_dict = {
@@ -304,8 +289,7 @@ def test_convert_to_image_response_with_hidden_params():
 
     assert result._hidden_params == {"api_key": "test_key"}
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_multiple_images():
     # Test handling multiple images in response
     response_dict = {
@@ -322,8 +306,7 @@ def test_convert_to_image_response_multiple_images():
     assert result.data[0].url == "http://example.com/image1.jpg"
     assert result.data[1].url == "http://example.com/image2.jpg"
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_with_b64_json():
     # Test handling b64_json in response
     response_dict = {
@@ -335,8 +318,7 @@ def test_convert_to_image_response_with_b64_json():
 
     assert result.data[0].b64_json == "base64encodedstring"
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_with_extra_fields():
     response_dict = {
         "created": 1234567890,
@@ -357,8 +339,7 @@ def test_convert_to_image_response_with_extra_fields():
     assert result.data[0].url == "http://example.com/image1.jpg"
     assert result.data[1].url == "http://example.com/image2.jpg"
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_with_extra_fields_2():
     """
     Date from a non-OpenAI API could have some obscure field in addition to the expected ones. This should not break the conversion.
@@ -382,8 +363,7 @@ def test_convert_to_image_response_with_extra_fields_2():
     assert result.data[0].url == "http://example.com/image1.jpg"
     assert result.data[1].url == "http://example.com/image2.jpg"
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_with_none_usage_fields():
     """
     Test handling of None values in usage fields, specifically for gpt-image-1 responses.
@@ -420,8 +400,7 @@ def test_convert_to_image_response_with_none_usage_fields():
     assert result.usage.input_tokens_details.image_tokens == 0
     assert result.usage.input_tokens_details.text_tokens == 0
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_with_partial_none_usage_fields():
     """
     Test handling of mixed None and valid values in usage fields.
@@ -454,8 +433,7 @@ def test_convert_to_image_response_with_partial_none_usage_fields():
     assert result.usage.input_tokens_details.image_tokens == 0
     assert result.usage.input_tokens_details.text_tokens == 0
 
-
-@pytest.mark.usefixtures("_vcr_outcome_gate", "fake_openai_endpoint", "setup_and_teardown")
+@pytest.mark.usefixtures("_vcr_outcome_gate", "setup_and_teardown")
 def test_convert_to_image_response_with_valid_usage_fields():
     """
     Test that valid usage fields are preserved correctly.
