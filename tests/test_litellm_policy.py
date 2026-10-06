@@ -30,7 +30,7 @@ def _load_policy_module():
         }
     )
     try:
-        path = Path(__file__).with_name("litellm-policy.py")
+        path = Path(__file__).parents[1] / "litellm_policy.py"
         spec = importlib.util.spec_from_file_location("temki_litellm_policy_test", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
