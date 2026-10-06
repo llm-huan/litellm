@@ -74,6 +74,38 @@ def test_get_provider_create_fields():
     ), "Expected at least one provider to have detailed credential fields"
 
 
+def test_get_litellm_model_cost_map_catalog_only_excludes_runtime_registered_entries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import litellm
+    from litellm.litellm_core_utils.get_model_cost_map import GetModelCostMap
+
+    catalog: Final = GetModelCostMap.loaded_model_cost_map()
+    catalog_key: Final = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    assert catalog_key in catalog
+    runtime_key: Final = "bedrock-us.anthropic.claude-sonnet-4-5"
+    assert runtime_key not in catalog
+    monkeypatch.setattr(
+        litellm,
+        "model_cost",
+        {**litellm.model_cost, runtime_key: {"litellm_provider": "bedrock", "mode": "chat"}},
+    )
+    app: Final = FastAPI()
+    app.include_router(router)
+    client: Final = TestClient(app)
+
+    live_response: Final = client.get("/public/litellm_model_cost_map")
+    catalog_response: Final = client.get("/public/litellm_model_cost_map", params={"catalog_only": "true"})
+
+    assert live_response.status_code == 200
+    assert live_response.json()[runtime_key] == {"litellm_provider": "bedrock", "mode": "chat"}
+    assert catalog_response.status_code == 200
+    catalog_payload: Final = catalog_response.json()
+    assert runtime_key not in catalog_payload
+    assert catalog_payload.keys() == catalog.keys()
+    assert catalog_payload[catalog_key] == dict(catalog[catalog_key])
+
+
 def test_get_litellm_model_cost_map_returns_cost_map():
     app = FastAPI()
     app.include_router(router)
